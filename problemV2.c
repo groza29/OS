@@ -73,6 +73,40 @@ void format(struct stat file){
                     printf("Execution:NO\n");
                 }
 }
+void getLinkname(char* file){
+    char buffer[1024];
+
+    readlink(file,buffer,sizeof(buffer)-1);
+    printf("The link name of %s is %s\n ",file,buffer);
+}
+void getLinksize(char* file){
+    char buffer[1024];
+    readlink(file,buffer,sizeof(buffer)-1);
+    struct stat Target;
+    lstat(buffer,&Target);
+    printf("The link size of %s is %lld\n ",file,Target.st_size);
+}
+void check_c_files(char* dir_name){
+    DIR *dir;
+    struct dirent *ent;
+    int count = 0;
+    int len;
+    dir = opendir(dir_name);
+    if(dir!=NULL )
+    {
+        while((ent = readdir(dir)) !=NULL){
+            len = strlen(ent->d_name);
+            if(strcmp(ent->d_name+len -2,".c") == 0)
+                count++;
+
+        }
+        closedir(dir);
+    }else{
+        printf("Error opening dir\n");
+    }
+    printf("The number of c files is %d",count);
+
+}
 void menu(char name[],struct stat file_stat){
     char choose;
             if(S_ISREG(file_stat.st_mode)){
@@ -87,9 +121,9 @@ void menu(char name[],struct stat file_stat){
                 scanf("%c",&choose);
                 switch (choose)
                 {
-                case 'n':printf("File name: %s\n", argv[i]); break;
-                case 'd':printf("The file size is %ld",file_stat.st_size);break;
-                case 'h':printf("The number of hard links is %ld\n",file_stat.st_nlink);break;
+                case 'n':printf("File name: %s\n", name); break;
+                case 'd':printf("The file size is %lld",file_stat.st_size);break;
+                case 'h':printf("The number of hard links is %hu\n",file_stat.st_nlink);break;
                 case 'm':printf("%d minutes and %d seconds have elapsed since the file has been modified", time->tm_min,time->tm_sec);break;
                 case 'a':format(file_stat);break;
                 case 'l': printf("Name of the link you want to create: \n");
@@ -97,14 +131,14 @@ void menu(char name[],struct stat file_stat){
                 scanf("%s",str);
                 symlink(name,str);
                 printf("The link %s was created\n",str);
-                break
+                break;
                 default:
                     break;
                     }
                 
             }
             else if(S_ISLNK(file_stat.st_mode)){
-                printf("%s is a sym link \n",argv[i]);
+                printf("%s is a sym link \n",name);
                 printf("Choose one \n");
                 printf("-n(link name)\n");
                 printf("-l (delete link)\n");
@@ -114,27 +148,45 @@ void menu(char name[],struct stat file_stat){
                 scanf("%c",&choose);
                 switch (choose)
                 {
-                case /* constant-expression */:
-                    /* code */
+                case 'n':
+                    getLinkname(name);
                     break;
-                
+                case 'l':
+                    unlink(name);
+                    printf("The link was deleted\n");
+                    break;
+                case 'd':
+                    printf("Size of the link is %lld \n", file_stat.st_size);
+                    break;
+                case 't':
+                    getLinksize(name); 
+                    break;
+                case 'a':
+                    format(file_stat);
+                    break;
                 default:
                     break;
                 }
 
             }
             else if(S_ISDIR(file_stat.st_mode)){
-                printf("%s is a directory \n", argv[i]);
+                printf("%s is a directory \n", name);
                 printf("-d size\n");
                 printf("-a access rights\n");
                 printf("-c total number with the .c extension");
-                scanf("%c",&choose)
+                scanf("%c",&choose);
                 switch (choose)
                 {
-                case /* constant-expression */:
-                    /* code */
+                case 'n':printf("File name is %s\n",name);
                     break;
-                
+                case 'd':printf("Size of the file is %lld\n",file_stat.st_size);
+                break;
+                case 'c':
+                    check_c_files(name);
+                    break;
+                case 'a':
+                    format(file_stat);
+                break;
                 default:
                     break;
                 }
@@ -146,14 +198,13 @@ int main(int argc, char *argv[]){
         printf("Please insert more arguments");
         return -1;
     }
-    else{
         int pid[argc];
         int second_pid[argc];
         int contor=0;
         struct stat file_stat;
     for(int i =0 ;i < argc;i++){
         if(lstat(argv[i],&file_stat)<0){
-                printf("Error reading file")
+                printf("Error reading file");
                 return 0;
             }
         contor++;
@@ -180,14 +231,13 @@ int main(int argc, char *argv[]){
                     }
                 }
             }
-     }
     }
     int status;
     pid_t w;
-    for(i=1; i<contor; i++){
+    for(int i=1; i<contor; i++){
 		w = wait(&status);
 		if(w==-1){
-			printf("Eroare la wait!\n");
+			printf("Error at wait!\n");
 			exit(4);
 		}
 		if(WIFEXITED(status)){
