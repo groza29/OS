@@ -279,11 +279,12 @@ int main(int argc, char *argv[]){
                 }
             }
                 FILE *stream;
-                int warning,error;
+                int warning=0;
+                int error=0;
                 close(pfd[1]);
                 stream=fdopen(pfd[0],"r");
-                fscanf(stream,"%d",warning);
-                fscanf(stream,"%d",error);
+                fscanf(stream,"%d",&warning);
+                fscanf(stream,"%d",&error);
                 checkWarningsandError(warning,error,argv[i]);
                 close(pfd[0]);
                 int status;
