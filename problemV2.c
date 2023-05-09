@@ -5,6 +5,28 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <string.h>
+#include <fcntl.h>
+void checkWarningsandError(int warning,int error,char name[]){
+    int fd;
+    char string[256];
+    fd=open("grades.txt",O_WRONLY | O_CREAT | O_TRUNC);
+    if(error==0&&warning==0){
+        sprintf(string,"%s : %d",name,10);
+    }
+    else if(error>=1){
+        sprintf(string,"%s : %d",name,1);
+    }
+    else if(warning>10){
+        sprintf(string,"%s : %d",name,2);
+    }
+    else{
+    int score= 2+8*(10-warning)/10;
+        sprintf(string,"%s : %d",name,score);
+    }
+    write(fd,string,sizeof(string));
+    
+    close(fd);
+}
 void format(struct stat file){
     printf("USER:\n");
                 if(file.st_mode & S_IRUSR )
@@ -199,43 +221,88 @@ int main(int argc, char *argv[]){
         return -1;
     }
         int pid[argc];
-        int second_pid[argc];
-        int contor=0;
         struct stat file_stat;
-    for(int i =0 ;i < argc;i++){
+    for(int i =1 ;i < argc;i++){
         if(lstat(argv[i],&file_stat)<0){
                 printf("Error reading file");
                 return 0;
             }
-        contor++;
         pid[i]=fork();
         if(pid[i]==0){
             menu(argv[i],file_stat);
             exit(0);
         }
-            else{
-                if(S_ISREG(file_stat.st_mode)&&strcmp(argv[i]-2,".c")){
-                contor++;
-                second_pid[i]=fork();
-                    if(second_pid[i]==0){
-                    execlp(".","compileFile.sh",argv[i],NULL);
+        else{
+            int pfd[2];
+            if(pipe(pfd)<0)
+	        {
+	        perror("Pipe creation error\n");
+	        exit(1);
+	        }
+            int second_pid;
+            if(S_ISREG(file_stat.st_mode)){
+                if(strcmp(argv[i]-2,".c")){
+                    second_pid=fork();
+                    if(second_pid==0){
+                    close(pfd[0]);
+                    dup2(pfd[1],1);
+                    execlp("./compileFile.sh","compileFile.sh",argv[i],NULL);
                     exit(0);
                     }
                 }
-                else if(S_ISDIR(file_stat.st_mode)){
-                    contor++;
-                    second_pid[i]=fork();
-                    if(second_pid[i]==0){
-                    execlp(".","createFile.sh",argv[i],NULL);
+                else{
+                    second_pid=fork();
+                    if(second_pid==0){
+                    close(pfd[0]);
+                    close(pfd[1]);
+                    execlp("wc","wc","-l",argv[i],NULL);
                     exit(0);
                     }
                 }
             }
+            else if(S_ISDIR(file_stat.st_mode)){
+                    second_pid=fork();
+                    if(second_pid==0){
+                    close(pfd[0]);
+                    close(pfd[1]);
+                    execlp("./createFile.sh","createFile.sh",argv[i],NULL);
+                    exit(0);
+                }
+            }
+            else if(S_ISLNK(file_stat.st_mode)){
+                second_pid=fork();
+                    if(second_pid==0){
+                    close(pfd[0]);
+                    close(pfd[1]);
+                    execlp("chmod","chmod",760,argv[i],NULL);
+                    exit(0);
+                }
+            }
+                FILE *stream;
+                int warning,error;
+                close(pfd[1]);
+                stream=fdopen(pfd[0],"r");
+                fscanf(stream,"%d",warning);
+                fscanf(stream,"%d",error);
+                checkWarningsandError(warning,error,argv[i]);
+                close(pfd[0]);
+                int status;
+                pid_t w;
+		        w = wait(&status);
+		        if(w==-1){
+			        printf("Error at wait!\n");
+			        exit(4);
+		        }
+		        if(WIFEXITED(status)){
+			        printf("\nChild end correct: pid=%d, status=%d\n", w, WIFEXITED(status));
+		        }
+                
+            }
     }
     int status;
     pid_t w;
-    for(int i=1; i<contor; i++){
-		w = wait(&status);
+    for(int i=1;i<argc;i++){
+        w = wait(&status);
 		if(w==-1){
 			printf("Error at wait!\n");
 			exit(4);
@@ -243,6 +310,6 @@ int main(int argc, char *argv[]){
 		if(WIFEXITED(status)){
 			printf("\nChild end correct: pid=%d, status=%d\n", w, WIFEXITED(status));
 		}
-	}
+    }
     return 0;
 }
